@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Smart Studio Teleprompter & Clean MP3 Streamer</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #eef2ff;
+            --success: #10b981;
+            --video-accent: #8b5cf6;
+            --danger: #ef4444;
+            --bg: #0b0f19;
+            --card-bg: #111827;
+            --border: #1f2937;
+            --border-light: rgba(255, 255, 255, 0.08);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+
+            /* Teleprompter Reader */
+            --viewer-bg: #111827;
+            --out-color: #f9fafb;
+            --out-size: 20px;
+            --in-color: #34d399;
+            --in-size: 17px;
+            --pair-hover-bg: rgba(255, 255, 255, 0.03);
+            --card-opacity: 0.92;
+            --highlight-bg: linear-gradient(135deg, #f59e0b, #eab308);
+            --highlight-color: #000;
+        }
+
+        /* LIGHT THEME */
+        body.theme-light {
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --border-light: rgba(0, 0, 0, 0.06);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --viewer-bg: #ffffff;
+            --out-color: #0f172a;
+            --in-color: #059669;
+            --pair-hover-bg: rgba(241, 245, 249, 0.7);
+            --highlight-bg: linear-gradient(135deg, #fbbf24, #f59e0b);
+            --highlight-color: #1c1917;
+        }
+
+        /* SEPIA THEME */
+        body.theme-sepia {
+            --bg: #f5ede2;
+            --card-bg: #fcf8f2;
+            --border: #e6dac8;
+            --border-light: rgba(138, 105, 71, 0.15);
+            --text-main: #2e2216;
+            --text-muted: #786450;
+            --viewer-bg: #fcf8f2;
+            --out-color: #2b1b11;
+            --in-color: #92400e;
+            --pair-hover-bg: rgba(230, 218, 200, 0.5);
+            --highlight-bg: linear-gradient(135deg, #d97706, #b45309);
+            --highlight-color: #ffffff;
+        }
+
+        /* MIDNIGHT THEME */
+        body.theme-midnight {
+            --bg: #030712;
+            --card-bg: #090e1a;
+            --border: #1e293b;
+            --border-light: rgba(56, 189, 248, 0.1);
+            --text-main: #f0f9ff;
+            --text-muted: #94a3b8;
+            --viewer-bg: #090e1a;
+            --out-color: #38bdf8;
+            --in-color: #a7f3d0;
+            --pair-hover-bg: rgba(15, 23, 42, 0.8);
+            --highlight-bg: linear-gradient(135deg, #38bdf8, #818cf8);
+            --highlight-color: #030712;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            position: relative;
+            padding: 24px 16px;
+            transition: background-color 0.35s ease, color 0.35s ease;
+        }
+
+        #bgOverlay {
+            position: fixed;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -1;
+            pointer-events: none;
+            transition: filter 0.4s ease, opacity 0.4s ease;
+        }
+
+        body.has-bg .editor-wrapper {
+            background: rgba(17, 24, 39, var(--card-opacity)) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+        }
+        body.has-bg.theme-light .editor-wrapper {
+            background: rgba(255, 255, 255, var(--card-opacity)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.6) !important;
+        }
+        body.has-bg.theme-sepia .editor-wrapper {
+            background: rgba(252, 248, 242, var(--card-opacity)) !important;
+        }
+        body.has-bg .reading-viewer {
+            background: transparent !important;
+        }
+
+        .app-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .app-container.ratio-16-9 { max-width: 960px; }
+        .app-container.ratio-16-9 .editor-wrapper { width: 100%; aspect-ratio: 16 / 9; max-height: 82vh; }
+
+        .app-container.ratio-9-16 { max-width: 440px; }
+        .app-container.ratio-9-16 .editor-wrapper { width: 100%; aspect-ratio: 9 / 16; max-height: 90vh; }
+        .app-container.ratio-9-16 .pair-card { padding: 10px 12px; margin-bottom: 20px; }
+
+        .editor-wrapper {
+            background: var(--card-bg);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: background 0.3s, border-color 0.3s;
+        }
+
+        .frame-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.08);
+            border-bottom: 1px solid var(--border-light);
+            font-size: 13px;
+        }
+        .window-dots { display: flex; gap: 7px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot-red { background: #ef4444; }
+        .dot-yellow { background: #f59e0b; }
+        .dot-green { background: #10b981; }
+
+        .frame-title {
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .progress-badge {
+            font-size: 11.5px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--primary);
+            background: rgba(79, 70, 229, 0.12);
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(79, 70, 229, 0.25);
+            transition: all 0.2s ease;
+            min-width: 48px;
+            text-align: center;
+        }
+        .progress-bar-track {
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.04);
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4f46e5, #06b6d4, #10b981);
+            transition: width 0.15s ease-out;
+        }
+
+        textarea {
+            width: 100%;
+            flex: 1;
+            height: 100%;
+            min-height: 0;
+            padding: 24px 28px;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 16.5px;
+            line-height: 1.85;
+            color: inherit;
+            resize: none;
+            outline: none;
+            display: block;
+        }
+        textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+
+        .reading-viewer {
+            width: 100%;
+            flex: 1;
+            height: 100%;
+            min-height: 0;
+            padding: 40px 24px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            scroll-behavior: smooth;
+            display: none;
+            text-align: center;
+            background-color: var(--viewer-bg);
+        }
+
+        .reading-viewer::-webkit-scrollbar, textarea::-webkit-scrollbar { width: 6px; }
+        .reading-viewer::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3); border-radius: 10px;
+        }
+
+        .pair-card {
+            margin: 0 auto 36px auto;
+            max-width: 740px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 14px 20px;
+            border-radius: 14px;
+            transition: all 0.25s ease;
+        }
+        .pair-card:hover { background-color: var(--pair-hover-bg); }
+        .pair-card:last-child { margin-bottom: 24px; }
+
+        .seg-block { margin: 0; padding: 4px 8px; border-radius: 8px; transition: all 0.2s ease; }
+        .seg-outside {
+            color: var(--out-color) !important;
+            font-size: var(--out-size) !important;
+            font-weight: 700;
+            line-height: 1.55;
+            letter-spacing: -0.01em;
+        }
+
+        .seg-inside {
+            color: var(--in-color) !important;
+            font-size: var(--in-size) !important;
+            font-style: normal;
+            font-weight: 500;
+            line-height: 1.55;
+            opacity: 0.9;
+        }
+
+        .word-span {
+            display: inline-block;
+            border-radius: 6px;
+            padding: 0 2px;
+            transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+
+        .active-word {
+            background: var(--highlight-bg) !important;
+            color: var(--highlight-color) !important;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 6px;
+            transform: scale(1.08) translateY(-1px);
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+        }
+
+        .active-seg { background-color: rgba(99, 102, 241, 0.08); border-radius: 10px; }
+
+        .editor-footer {
+            flex-shrink: 0;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.05);
+            border-top: 1px solid var(--border-light);
+            font-size: 13px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-container { display: flex; align-items: center; gap: 8px; max-width: 68%; }
+        .status-indicator {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--success); transition: background 0.3s;
+        }
+        .status-indicator.busy {
+            background: var(--danger); animation: pulse-dot 1.2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+        }
+
+        .status-badge {
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #fabSettings {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            user-select: none;
+            z-index: 99;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
+            color: var(--text-main);
+        }
+        #fabSettings:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2); }
+        #fabSettings:active { cursor: grabbing; transform: scale(0.95); }
+
+        .speed-dial-container {
+            position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; z-index: 100; user-select: none; touch-action: none;
+        }
+        .dial-main-btn {
+            width: 60px; height: 60px; border-radius: 18px; background: var(--primary); color: #ffffff;
+            display: flex; align-items: center; justify-content: center; cursor: grab; border: none;
+            box-shadow: 0 10px 25px -4px rgba(79, 70, 229, 0.5);
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; z-index: 2;
+        }
+        .dial-main-btn svg { width: 26px; height: 26px; transition: transform 0.25s; }
+        .dial-main-btn:active { cursor: grabbing; transform: scale(0.92); }
+        .dial-main-btn.open svg { transform: rotate(45deg); }
+        .dial-main-btn.open { background: #4b5563; }
+        
+        .dial-main-btn.speaking {
+            background: var(--danger) !important;
+            animation: pulse-ring 1.8s infinite cubic-bezier(0.4, 0, 0.6, 1);
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 18px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .dial-item {
+            position: absolute; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 12px;
+            opacity: 0; pointer-events: none; transform: scale(0.4);
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 1;
+        }
+        .dial-btn {
+            width: 48px; height: 48px; border-radius: 14px; border: none; color: #fff;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); transition: transform 0.15s;
+        }
+        .dial-btn svg { width: 22px; height: 22px; fill: currentColor; }
+        .dial-btn:hover { transform: scale(1.08); }
+        .dial-btn.play { background: #2563eb; }
+        .dial-btn.audio { background: #059669; }
+        .dial-btn.video { background: #7c3aed; }
+        .dial-btn.stop { background: #dc2626; }
+
+        .dial-label {
+            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); color: #ffffff;
+            font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px; white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .speed-dial-container.active .dial-item:nth-child(1) { transform: translateY(-64px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.active .dial-item:nth-child(2) { transform: translateY(-124px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.active .dial-item:nth-child(3) { transform: translateY(-184px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.active .dial-item:nth-child(4) { transform: translateY(-244px) scale(1); opacity: 1; pointer-events: auto; }
+
+        .speed-dial-container.expand-down.active .dial-item:nth-child(1) { transform: translateY(64px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.expand-down.active .dial-item:nth-child(2) { transform: translateY(124px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.expand-down.active .dial-item:nth-child(3) { transform: translateY(184px) scale(1); opacity: 1; pointer-events: auto; }
+        .speed-dial-container.expand-down.active .dial-item:nth-child(4) { transform: translateY(244px) scale(1); opacity: 1; pointer-events: auto; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        
+        .modal-card {
+            background: var(--card-bg); border-radius: 20px; width: 92%; max-width: 520px;
+            padding: 24px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-height: 88vh; overflow-y: auto; color: var(--text-main);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); transform: scale(0.96);
+        }
+        .modal-overlay.active .modal-card { transform: scale(1); }
+
+        .tab-bar {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: rgba(0, 0, 0, 0.1);
+            padding: 4px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border-light);
+        }
+        .tab-btn {
+            background: transparent; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13.5px;
+            font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .tab-btn.active { background: var(--card-bg); color: var(--text-main); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .setting-section {
+            background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-light);
+            border-radius: 14px; padding: 14px; margin-bottom: 14px;
+        }
+        .setting-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+
+        .select-grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; margin-bottom: 12px; }
+
+        select, input[type="text"] {
+            width: 100%; background: var(--card-bg); border: 1px solid var(--border);
+            padding: 8px 12px; border-radius: 10px; font-size: 13px; outline: none;
+            color: var(--text-main); transition: border-color 0.2s;
+        }
+        select:focus, input[type="text"]:focus { border-color: var(--primary); }
+
+        input[type="range"] {
+            -webkit-appearance: none; width: 100%; height: 6px; background: var(--border);
+            border-radius: 8px; outline: none; margin: 6px 0;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+            background: var(--primary); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transition: transform 0.15s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .ratio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .ratio-btn {
+            padding: 12px; border: 1.5px solid var(--border); border-radius: 12px;
+            background: var(--card-bg); font-size: 13px; font-weight: 600; color: var(--text-main);
+            cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .ratio-btn.active { border-color: var(--primary); background: rgba(79, 70, 229, 0.08); color: var(--primary); }
+
+        .theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+        .theme-card {
+            border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 4px; text-align: center;
+            cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; color: var(--text-muted);
+        }
+        .theme-card:hover { transform: translateY(-2px); }
+        .theme-card.active { border-color: var(--primary); background: rgba(79, 70, 229, 0.08); color: var(--primary); }
+
+        .custom-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+        .color-picker-wrapper { display: flex; align-items: center; gap: 6px; }
+        input[type="color"] {
+            -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; background: transparent;
+        }
+        input[type="color"]::-webkit-color-swatch { border-radius: 50%; border: 2px solid var(--border); }
+
+        .btn-action-sm {
+            padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--card-bg); color: var(--text-main); cursor: pointer; font-size: 12.5px; font-weight: 600; transition: all 0.15s;
+        }
+        .btn-action-sm:hover { border-color: var(--primary); }
+
+        .btn-save-modal {
+            width: 100%; padding: 12px; background: var(--primary); color: #ffffff;
+            border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: background 0.2s;
+        }
+        .btn-save-modal:hover { background: var(--primary-hover); }
+
+        body.recording-mode #fabSettings { opacity: 0; pointer-events: none; }
+        body.recording-mode .dial-main-btn { opacity: 0.2; }
+        body.recording-mode .dial-main-btn:hover { opacity: 1; }
+    </style>
+</head>
+<body class="theme-dark">
+
+    <div id="bgOverlay"></div>
+
+    <div id="fabSettings" title="Kéo để di chuyển / Nhấp để cài đặt">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+    </div>
+
+    <!-- Speed Dial -->
+    <div class="speed-dial-container" id="dialWrapper">
+        <div class="dial-item" onclick="triggerAction('play')">
+            <span class="dial-label">Đọc & Highlight</span>
+            <button class="dial-btn play" title="Đọc">
+                <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+        </div>
+        <div class="dial-item" onclick="triggerAction('audio')">
+            <span class="dial-label">Tải MP3 Sạch 100% (Google Play Books)</span>
+            <button class="dial-btn audio" title="Tải MP3 Không Rè">
+                <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            </button>
+        </div>
+        <div class="dial-item" onclick="triggerAction('video')">
+            <span class="dial-label">Quay Video Karaoke</span>
+            <button class="dial-btn video" title="Quay Video">
+                <svg viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+            </button>
+        </div>
+        <div class="dial-item" onclick="triggerAction('stop')">
+            <span class="dial-label">Dừng lại</span>
+            <button class="dial-btn stop" title="Dừng">
+                <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"></rect></svg>
+            </button>
+        </div>
+        <button class="dial-main-btn" id="dialMainBtn" title="Kéo để di chuyển / Nhấp để mở lệnh">
+            <svg id="dialIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Modal Cài đặt -->
+    <div class="modal-overlay" id="settingsModal" onclick="closeOnBackdrop(event)">
+        <div class="modal-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                <h3 style="font-size: 17px; font-weight: 800;">Studio Controls</h3>
+                <button style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-muted); line-height: 1;" onclick="toggleModal(false)">&times;</button>
+            </div>
+
+            <div class="tab-bar">
+                <button class="tab-btn active" onclick="switchTab('voiceTab')">🎙️ Giọng đọc</button>
+                <button class="tab-btn" onclick="switchTab('themeTab')">🎨 Giao diện & Tỉ lệ</button>
+            </div>
+
+            <!-- TAB 1: GIỌNG ĐỌC -->
+            <div id="voiceTab" class="tab-content active">
+                <div class="setting-section">
+                    <div class="setting-title" style="color: #60a5fa;"><span>🌐</span> Câu gốc (Ngoài ngoặc [ ])</div>
+                    <div class="select-grid">
+                        <select id="langOutside" onchange="onLangChange('outside')"></select>
+                        <select id="voiceOutside"></select>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>Tốc độ phát:</span><b id="rateOutVal">1.0x</b>
+                    </div>
+                    <input type="range" id="rateOutside" min="0.5" max="2.0" step="0.1" value="1.0">
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title" style="color: #34d399;"><span>🇻🇳</span> Bản dịch (Trong ngoặc [ ])</div>
+                    <div class="select-grid">
+                        <select id="langInside" onchange="onLangChange('inside')"></select>
+                        <select id="voiceInside"></select>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <span>Tốc độ phát:</span><b id="rateInVal">1.0x</b>
+                    </div>
+                    <input type="range" id="rateInside" min="0.5" max="2.0" step="0.1" value="1.0">
+                </div>
+
+                <div style="font-size: 11.5px; color: var(--text-muted); padding: 4px 6px; line-height: 1.6;">
+                    🛡️ <b>Clean Audio Stream:</b> Tự động khóa tần số gốc của phần cứng (Native Sample Rate), lọc sạch tiếng rè kim loại, lệch pha và chống giật âm tuyệt đối.
+                </div>
+            </div>
+
+            <!-- TAB 2: TỈ LỆ & GIAO DIỆN -->
+            <div id="themeTab" class="tab-content">
+                <div class="setting-section">
+                    <div class="setting-title" style="color: #38bdf8;"><span>📐</span> Khung hình Teleprompter</div>
+                    <div class="ratio-grid">
+                        <button type="button" class="ratio-btn active" id="btnRatio169" onclick="setAspectRatio('16-9')">🖥️ 16:9 Ngang</button>
+                        <button type="button" class="ratio-btn" id="btnRatio916" onclick="setAspectRatio('9-16')">📱 9:16 Dọc</button>
+                    </div>
+                </div>
+
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">CHỦ ĐỀ MÀU SẮC</div>
+                <div class="theme-grid">
+                    <div class="theme-card" onclick="applyThemePreset('light')">☀️ Sáng</div>
+                    <div class="theme-card active" onclick="applyThemePreset('dark')">🌙 Dark</div>
+                    <div class="theme-card" onclick="applyThemePreset('sepia')">📜 Sepia</div>
+                    <div class="theme-card" onclick="applyThemePreset('midnight')">🌌 Midnight</div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title" style="color: #a78bfa;"><span>🖼️</span> Nền ứng dụng (Background)</div>
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <input type="file" id="bgFileInput" accept="image/*" style="display: none;" onchange="handleFileUpload(event)">
+                        <button type="button" class="btn-action-sm" onclick="document.getElementById('bgFileInput').click()">📁 Tải ảnh lên</button>
+                        <button type="button" class="btn-action-sm" style="color: var(--danger);" onclick="removeBackgroundImage()">❌ Gỡ nền</button>
+                    </div>
+                    <input type="text" id="bgUrlInput" placeholder="Dán link ảnh (URL)..." onchange="applyBgImage(this.value)">
+                    
+                    <div class="custom-row" style="margin-top: 10px;">
+                        <span style="font-size: 12px;">Độ mờ bảng chữ: <b id="cardOpacityVal">92%</b></span>
+                        <input type="range" id="cardOpacity" min="20" max="100" value="92" style="width: 50%;" oninput="updateCardOpacity()">
+                    </div>
+                    <div class="custom-row" style="margin-top: 8px;">
+                        <span style="font-size: 12px;">Độ nhòe nền (Blur): <b id="bgBlurVal">0px</b></span>
+                        <input type="range" id="bgBlur" min="0" max="25" value="0" style="width: 50%;" oninput="updateBgBlur()">
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title">🌐 Chữ ngoài ngoặc [ ]</div>
+                    <div class="custom-row">
+                        <span style="font-size: 12px;">Màu sắc:</span>
+                        <div class="color-picker-wrapper"><input type="color" id="colorPickerOut" value="#f9fafb" onchange="updateCustomStyle()"></div>
+                    </div>
+                    <div class="custom-row" style="margin-top: 6px;">
+                        <span style="font-size: 12px;">Cỡ chữ: <b id="fontSizeOutVal">20px</b></span>
+                        <input type="range" id="fontSizeOut" min="14" max="40" value="20" style="width: 55%;" oninput="updateCustomStyle()">
+                    </div>
+                </div>
+
+                <div class="setting-section">
+                    <div class="setting-title">🇻🇳 Chữ trong ngoặc [ ]</div>
+                    <div class="custom-row">
+                        <span style="font-size: 12px;">Màu sắc:</span>
+                        <div class="color-picker-wrapper"><input type="color" id="colorPickerIn" value="#34d399" onchange="updateCustomStyle()"></div>
+                    </div>
+                    <div class="custom-row" style="margin-top: 6px;">
+                        <span style="font-size: 12px;">Cỡ chữ: <b id="fontSizeInVal">17px</b></span>
+                        <input type="range" id="fontSizeIn" min="12" max="34" value="17" style="width: 55%;" oninput="updateCustomStyle()">
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-save-modal" onclick="toggleModal(false)">Hoàn tất & Áp dụng</button>
+        </div>
+    </div>
+
+    <!-- Frame chính -->
+    <div class="app-container ratio-16-9" id="appContainer">
+        <div class="editor-wrapper" id="editorWrapper">
+            <div class="frame-header">
+                <div class="window-dots">
+                    <div class="dot dot-red"></div>
+                    <div class="dot dot-yellow"></div>
+                    <div class="dot dot-green"></div>
+                </div>
+                <div class="frame-title">Teleprompter Canvas</div>
+                <div id="progressText" class="progress-badge" title="Tiến trình đọc">0%</div>
+            </div>
+
+            <div class="progress-bar-track">
+                <div id="progressBar" class="progress-bar-fill"></div>
+            </div>
+
+            <textarea id="textInput" placeholder="Nhập kịch bản song ngữ vào đây... (Nhấp chuột để chọn vị trí bắt đầu đọc)">I should begin by saying what an honor it is to make your acquaintance.
+[Tôi nên bắt đầu bằng cách nói rằng thật vinh dự được làm quen với bà.]
+
+I've read all about your games.
+[Tôi đã đọc về chiêu trò của bà.]
+
+Very impressive.
+[Rất ấn tượng đấy.]
+
+It's a shame to leave a mind as brilliant as yours rotting in such a hole.
+[Thật tiếc khi để một trí tuệ xuất sắc như bà mục rữa ở chốn này.]</textarea>
+
+            <div id="readingViewer" class="reading-viewer"></div>
+            
+            <div class="editor-footer">
+                <div class="status-container">
+                    <div class="status-indicator" id="statusDot"></div>
+                    <span class="status-badge" id="statusBar">Sẵn sàng</span>
+                </div>
+                <span id="charCount">0 ký tự, 0 cặp câu</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        const appContainer = document.getElementById("appContainer");
+        const textInput = document.getElementById("textInput");
+        const readingViewer = document.getElementById("readingViewer");
+        const statusBar = document.getElementById("statusBar");
+        const statusDot = document.getElementById("statusDot");
+        const charCount = document.getElementById("charCount");
+        const modal = document.getElementById("settingsModal");
+        
+        const progressText = document.getElementById("progressText");
+        const progressBar = document.getElementById("progressBar");
+
+        const fabSettings = document.getElementById("fabSettings");
+        const dialWrapper = document.getElementById("dialWrapper");
+        const dialMainBtn = document.getElementById("dialMainBtn");
+        const bgOverlay = document.getElementById("bgOverlay");
+
+        const langOutEl = document.getElementById("langOutside");
+        const voiceOutEl = document.getElementById("voiceOutside");
+        const rateOutEl = document.getElementById("rateOutside");
+        const rateOutVal = document.getElementById("rateOutVal");
+
+        const langInEl = document.getElementById("langInside");
+        const voiceInEl = document.getElementById("voiceInside");
+        const rateInEl = document.getElementById("rateInside");
+        const rateInVal = document.getElementById("rateInVal");
+
+        const colorPickerOut = document.getElementById("colorPickerOut");
+        const fontSizeOut = document.getElementById("fontSizeOut");
+        const fontSizeOutVal = document.getElementById("fontSizeOutVal");
+        const colorPickerIn = document.getElementById("colorPickerIn");
+        const fontSizeIn = document.getElementById("fontSizeIn");
+        const fontSizeInVal = document.getElementById("fontSizeInVal");
+
+        const bgUrlInput = document.getElementById("bgUrlInput");
+        const cardOpacity = document.getElementById("cardOpacity");
+        const cardOpacityVal = document.getElementById("cardOpacityVal");
+        const bgBlur = document.getElementById("bgBlur");
+        const bgBlurVal = document.getElementById("bgBlurVal");
+
+        const btnRatio169 = document.getElementById("btnRatio169");
+        const btnRatio916 = document.getElementById("btnRatio916");
+
+        let voices = [], voicesByLang = {};
+        let isRunning = false, mediaRecorder = null, recordedChunks = [], cursorStart = 0;
+        let activeWordSpan = null;
+        let currentThemePreset = 'dark';
+        let currentBgImage = '';
+        let currentRatio = '16-9';
+
+        let totalReadingLength = 0;
+        let cumulativeLengths = [];
+
+        /* ================== WEB WORKER LAME MP3 SẠCH (MONO AUDIOBOOK 192KBPS) ================== */
+        const cleanWorkerCode = `
+            importScripts('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js');
+
+            let mp3encoder = null;
+            let mp3Chunks = [];
+
+            self.onmessage = function(e) {
+                const msg = e.data;
+                if (msg.cmd === 'init') {
+                    mp3Chunks = [];
+                    // 1 channel (Mono Audio) triệt tiêu hoàn toàn lệch pha và tiếng rè kim loại
+                    mp3encoder = new lamejs.Mp3Encoder(1, msg.sampleRate, msg.kbps || 192);
+                } else if (msg.cmd === 'encode') {
+                    if (!mp3encoder) return;
+                    const pcm = msg.pcm; // Int16Array trực tiếp
+                    const mp3buf = mp3encoder.encodeBuffer(pcm);
+                    if (mp3buf.length > 0) {
+                        mp3Chunks.push(mp3buf);
+                    }
+                } else if (msg.cmd === 'finish') {
+                    if (mp3encoder) {
+                        const flushBuf = mp3encoder.flush();
+                        if (flushBuf.length > 0) {
+                            mp3Chunks.push(flushBuf);
+                        }
+                    }
+                    const blob = new Blob(mp3Chunks, { type: 'audio/mp3' });
+                    self.postMessage({ cmd: 'complete', blob: blob });
+                    mp3Chunks = [];
+                    mp3encoder = null;
+                }
+            };
+        `;
+
+        let mp3Worker = null;
+        let audioContext = null;
+        let audioSource = null;
+        let audioProcessor = null;
+        let silentGain = null;
+        let activeAudioStream = null;
+
+        function initMp3Worker() {
+            if (mp3Worker) mp3Worker.terminate();
+            const blob = new Blob([cleanWorkerCode], { type: 'application/javascript' });
+            mp3Worker = new Worker(URL.createObjectURL(blob));
+        }
+
+        function updateProgress(percent) {
+            percent = Math.max(0, Math.min(100, Math.round(percent)));
+            if (progressText) progressText.textContent = `${percent}%`;
+            if (progressBar) progressBar.style.width = `${percent}%`;
+        }
+
+        /* 1. ASPECT RATIO */
+        function setAspectRatio(ratio) {
+            currentRatio = ratio;
+            appContainer.classList.remove('ratio-16-9', 'ratio-9-16');
+            appContainer.classList.add(`ratio-${ratio}`);
+
+            btnRatio169.classList.toggle('active', ratio === '16-9');
+            btnRatio916.classList.toggle('active', ratio === '9-16');
+
+            saveThemeState();
+        }
+
+        /* 2. THEMES */
+        const themePresets = {
+            light: { outColor: '#0f172a', inColor: '#059669' },
+            dark: { outColor: '#f9fafb', inColor: '#34d399' },
+            sepia: { outColor: '#2b1b11', inColor: '#92400e' },
+            midnight: { outColor: '#38bdf8', inColor: '#a7f3d0' }
+        };
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-bar .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function applyThemePreset(presetKey) {
+            currentThemePreset = presetKey;
+            const p = themePresets[presetKey];
+            document.querySelectorAll('.theme-card').forEach((c, idx) => {
+                c.classList.toggle('active', ['light','dark','sepia','midnight'][idx] === presetKey);
+            });
+            document.body.classList.remove('theme-light', 'theme-dark', 'theme-sepia', 'theme-midnight');
+            document.body.classList.add(`theme-${presetKey}`);
+
+            colorPickerOut.value = p.outColor;
+            colorPickerIn.value = p.inColor;
+            updateCustomStyle();
+        }
+
+        /* 3. BACKGROUND */
+        function applyBgImage(imgSrc) {
+            currentBgImage = imgSrc ? imgSrc.trim() : '';
+            if (currentBgImage) {
+                bgOverlay.style.backgroundImage = `url("${currentBgImage}")`;
+                document.body.classList.add('has-bg');
+                bgUrlInput.value = currentBgImage.startsWith('data:') ? '' : currentBgImage;
+            } else {
+                bgOverlay.style.backgroundImage = 'none';
+                document.body.classList.remove('has-bg');
+                bgUrlInput.value = '';
+            }
+            saveThemeState();
+        }
+
+        function removeBackgroundImage() {
+            applyBgImage('');
+            document.getElementById('bgFileInput').value = '';
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 1920, maxH = 1080;
+                    let w = img.width, h = img.height;
+                    if (w > maxW || h > maxH) {
+                        const ratio = Math.min(maxW / w, maxH / h);
+                        w *= ratio; h *= ratio;
+                    }
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    applyBgImage(canvas.toDataURL('image/jpeg', 0.85));
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateCardOpacity() {
+            const val = cardOpacity.value;
+            cardOpacityVal.textContent = `${val}%`;
+            document.documentElement.style.setProperty('--card-opacity', (val / 100).toFixed(2));
+            saveThemeState();
+        }
+
+        function updateBgBlur() {
+            const val = bgBlur.value;
+            bgBlurVal.textContent = `${val}px`;
+            bgOverlay.style.filter = `blur(${val}px)`;
+            saveThemeState();
+        }
+
+        function updateCustomStyle() {
+            const outColor = colorPickerOut.value;
+            const inColor = colorPickerIn.value;
+            const outSize = `${fontSizeOut.value}px`;
+            const inSize = `${fontSizeIn.value}px`;
+
+            fontSizeOutVal.textContent = outSize;
+            fontSizeInVal.textContent = inSize;
+
+            document.documentElement.style.setProperty('--out-color', outColor);
+            document.documentElement.style.setProperty('--out-size', outSize);
+            document.documentElement.style.setProperty('--in-color', inColor);
+            document.documentElement.style.setProperty('--in-size', inSize);
+
+            saveThemeState();
+        }
+
+        function saveThemeState() {
+            try {
+                localStorage.setItem('tts_theme_v7', JSON.stringify({
+                    preset: currentThemePreset,
+                    outColor: colorPickerOut.value,
+                    inColor: colorPickerIn.value,
+                    outSize: fontSizeOut.value,
+                    inSize: fontSizeIn.value,
+                    bgImage: currentBgImage,
+                    opacity: cardOpacity.value,
+                    blur: bgBlur.value,
+                    ratio: currentRatio
+                }));
+            } catch (err) {}
+        }
+
+        function loadSavedTheme() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('tts_theme_v7') || localStorage.getItem('tts_theme_v6'));
+                if (saved) {
+                    fontSizeOut.value = saved.outSize || 20;
+                    fontSizeIn.value = saved.inSize || 17;
+                    applyThemePreset(saved.preset || 'dark');
+                    colorPickerOut.value = saved.outColor || '#f9fafb';
+                    colorPickerIn.value = saved.inColor || '#34d399';
+                    
+                    if (saved.opacity) {
+                        cardOpacity.value = saved.opacity;
+                        cardOpacityVal.textContent = `${saved.opacity}%`;
+                        document.documentElement.style.setProperty('--card-opacity', (saved.opacity / 100).toFixed(2));
+                    }
+                    if (saved.blur) {
+                        bgBlur.value = saved.blur;
+                        bgBlurVal.textContent = `${saved.blur}px`;
+                        bgOverlay.style.filter = `blur(${saved.blur}px)`;
+                    }
+                    if (saved.bgImage) applyBgImage(saved.bgImage);
+                    if (saved.ratio) setAspectRatio(saved.ratio);
+                    updateCustomStyle();
+                } else {
+                    applyThemePreset('dark');
+                }
+            } catch {
+                applyThemePreset('dark');
+            }
+        }
+        loadSavedTheme();
+
+        /* 4. DRAG & ACTIONS */
+        function makeDraggable(element, onClickCallback) {
+            let isDragging = false, hasMoved = false, startX, startY, origX, origY;
+
+            const onStart = (e) => {
+                isDragging = true; hasMoved = false;
+                const pt = e.touches ? e.touches[0] : e;
+                startX = pt.clientX; startY = pt.clientY;
+                const rect = element.getBoundingClientRect();
+                origX = rect.left; origY = rect.top;
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const pt = e.touches ? e.touches[0] : e;
+                const dx = pt.clientX - startX; const dy = pt.clientY - startY;
+
+                if (Math.hypot(dx, dy) > 4) {
+                    hasMoved = true;
+                    dialWrapper.classList.remove("active");
+                    dialMainBtn.classList.remove("open");
+                    let newX = Math.max(15, Math.min(window.innerWidth - element.offsetWidth - 15, origX + dx));
+                    let newY = Math.max(15, Math.min(window.innerHeight - element.offsetHeight - 15, origY + dy));
+                    element.style.left = `${newX}px`; element.style.top = `${newY}px`;
+                    element.style.right = 'auto'; element.style.bottom = 'auto';
+                    if (element === dialWrapper) dialWrapper.classList.toggle("expand-down", newY < 280);
+                }
+            };
+
+            const onEnd = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                if (!hasMoved && onClickCallback) onClickCallback();
+            };
+
+            element.addEventListener("mousedown", onStart);
+            window.addEventListener("mousemove", onMove);
+            window.addEventListener("mouseup", onEnd);
+            element.addEventListener("touchstart", onStart, { passive: true });
+            window.addEventListener("touchmove", onMove, { passive: true });
+            window.addEventListener("touchend", onEnd);
+        }
+
+        makeDraggable(fabSettings, () => toggleModal(true));
+        makeDraggable(dialWrapper, () => {
+            if (isRunning) { stopAll(); return; }
+            const isActive = dialWrapper.classList.toggle("active");
+            dialMainBtn.classList.toggle("open", isActive);
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!dialWrapper.contains(e.target)) {
+                dialWrapper.classList.remove("active");
+                dialMainBtn.classList.remove("open");
+            }
+        });
+
+        function triggerAction(action) {
+            dialWrapper.classList.remove("active");
+            dialMainBtn.classList.remove("open");
+            if (action === 'play') runProcess('play');
+            if (action === 'audio') runProcess('audio');
+            if (action === 'video') runProcess('video');
+            if (action === 'stop') stopAll();
+        }
+
+        function toggleModal(show) { modal.classList.toggle("active", show); }
+        function closeOnBackdrop(e) { if (e.target === modal) toggleModal(false); }
+
+        rateOutEl.oninput = () => rateOutVal.textContent = `${rateOutEl.value}x`;
+        rateInEl.oninput = () => rateInVal.textContent = `${rateInEl.value}x`;
+
+        /* 5. VOICES */
+        function setupLanguages() {
+            voices = synth.getVoices();
+            if (!voices.length) return;
+
+            voicesByLang = {};
+            voices.forEach((v, idx) => {
+                v._globalIndex = idx;
+                if (!voicesByLang[v.lang]) voicesByLang[v.lang] = [];
+                voicesByLang[v.lang].push(v);
+            });
+
+            const sortedLangs = Object.keys(voicesByLang).sort((a, b) => {
+                const getRank = l => l.startsWith('vi') ? 2 : l.startsWith('en') ? 1 : 0;
+                return getRank(b) - getRank(a) || a.localeCompare(b);
+            });
+
+            fillLangDropdown(langOutEl, sortedLangs, "en-US");
+            fillLangDropdown(langInEl, sortedLangs, "vi-VN");
+
+            onLangChange('outside', 'Jenny');
+            onLangChange('inside', 'HoaiMy');
+        }
+
+        function fillLangDropdown(selectEl, langs, defaultCode) {
+            selectEl.innerHTML = "";
+            langs.forEach(lang => {
+                const opt = document.createElement("option");
+                opt.value = lang; opt.textContent = lang;
+                if (lang === defaultCode) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        function onLangChange(type, preferredVoiceName = '') {
+            const isOut = type === 'outside';
+            const langEl = isOut ? langOutEl : langInEl;
+            const voiceEl = isOut ? voiceOutEl : voiceInEl;
+            const voiceList = voicesByLang[langEl.value] || [];
+
+            voiceEl.innerHTML = "";
+            voiceList.forEach(v => {
+                const opt = document.createElement("option");
+                opt.value = v._globalIndex;
+                const isNatural = v.name.includes("Natural") || v.name.includes("Online");
+                let cleanName = v.name.replace("Microsoft ", "").replace("Online (Natural)", "").replace("Neural", "").trim();
+                opt.textContent = `${cleanName} ${isNatural ? '⚡ AI' : ''}`;
+                if (preferredVoiceName && v.name.includes(preferredVoiceName)) opt.selected = true;
+                voiceEl.appendChild(opt);
+            });
+        }
+
+        synth.onvoiceschanged = setupLanguages;
+        setupLanguages();
+
+        /* 6. PARSER */
+        function countPairs(rawText) {
+            if (!rawText.trim()) return 0;
+            const segments = parseSegments(rawText, 0);
+            let count = 0, hasCurrentPair = false;
+            segments.forEach(seg => {
+                if (seg.type === 'outside' || !hasCurrentPair) { count++; hasCurrentPair = true; }
+            });
+            return count;
+        }
+
+        const trackCursor = () => {
+            cursorStart = textInput.selectionStart;
+            charCount.textContent = `${textInput.value.length} ký tự, ${countPairs(textInput.value)} cặp câu`;
+        };
+        ["keyup", "click", "select", "input"].forEach(evt => textInput.addEventListener(evt, trackCursor));
+        trackCursor();
+
+        function parseSegments(raw, pos) {
+            pos = (pos >= raw.length) ? 0 : pos;
+            const segments = [], regex = /\[(.*?)\]|([^\[\]]+)/gs;
+            let match;
+
+            while ((match = regex.exec(raw)) !== null) {
+                if (match.index + match[0].length <= pos) continue;
+                const isInside = match[1] !== undefined;
+                let txt = isInside ? match[1] : match[2];
+
+                if (match.index < pos) {
+                    const offset = isInside ? Math.max(0, pos - (match.index + 1)) : pos - match.index;
+                    txt = txt.substring(offset);
+                }
+
+                txt = txt.replace(/^\]+|\[+$/g, '').trim();
+                if (txt) segments.push({ text: txt, type: isInside ? "inside" : "outside" });
+            }
+            return segments;
+        }
+
+        function renderStreamingViewer(segments) {
+            readingViewer.innerHTML = "";
+            let currentPairCard = null;
+
+            segments.forEach((seg, sIdx) => {
+                if (seg.type === 'outside' || !currentPairCard) {
+                    currentPairCard = document.createElement("div");
+                    currentPairCard.className = "pair-card";
+                    readingViewer.appendChild(currentPairCard);
+                }
+
+                const segSpan = document.createElement("div");
+                segSpan.id = `seg_${sIdx}`;
+                segSpan.className = `seg-block ${seg.type === 'inside' ? 'seg-inside' : 'seg-outside'}`;
+
+                let currentOffset = 0;
+                const words = seg.text.split(/(\s+)/);
+
+                words.forEach(w => {
+                    if (w.trim() === "") {
+                        segSpan.appendChild(document.createTextNode(w));
+                    } else {
+                        const wSpan = document.createElement("span");
+                        wSpan.className = "word-span";
+                        wSpan.id = `w_${sIdx}_${currentOffset}`;
+                        wSpan.textContent = w;
+                        segSpan.appendChild(wSpan);
+                    }
+                    currentOffset += w.length;
+                });
+
+                currentPairCard.appendChild(segSpan);
+            });
+        }
+
+        /* 7. EXECUTION (GHI ÂM VÀ NÉN CUỐN CHIẾU SẠCH HOÀN TOÀN) */
+        async function runProcess(mode = 'play') {
+            stopAll();
+            const text = textInput.value;
+            if (!text.trim()) return;
+
+            const segments = parseSegments(text, cursorStart);
+            if (!segments.length) return;
+
+            totalReadingLength = segments.reduce((sum, s) => sum + s.text.length, 0);
+            cumulativeLengths = [];
+            let rTotal = 0;
+            segments.forEach(s => {
+                cumulativeLengths.push(rTotal);
+                rTotal += s.text.length;
+            });
+            updateProgress(0);
+
+            renderStreamingViewer(segments);
+            textInput.style.display = "none";
+            readingViewer.style.display = "block";
+
+            activeAudioStream = null;
+
+            if (mode === 'audio' || mode === 'video') {
+                try {
+                    activeAudioStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+
+                    const audioTrack = activeAudioStream.getAudioTracks()[0];
+                    if (!audioTrack) {
+                        alert("⚠️ BẮT BUỘC: Bạn phải tích chọn 'Chia sẻ âm thanh' (Share audio) để thu tiếng!");
+                        activeAudioStream.getTracks().forEach(t => t.stop());
+                        stopAll(); return;
+                    }
+
+                    if (mode === 'audio') {
+                        // Tự động nhận tần số gốc phần cứng (không ép 44100 để tránh rè)
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const nativeSampleRate = audioContext.sampleRate;
+
+                        initMp3Worker();
+                        mp3Worker.postMessage({ cmd: 'init', sampleRate: nativeSampleRate, kbps: 192 });
+
+                        audioSource = audioContext.createMediaStreamSource(new MediaStream([audioTrack]));
+
+                        // Tăng bộ đệm an toàn lên 16384 mẫu (~350ms) loại bỏ 100% tiếng lách tách
+                        audioProcessor = audioContext.createScriptProcessor(16384, 2, 1);
+                        silentGain = audioContext.createGain();
+                        silentGain.gain.value = 0;
+
+                        audioProcessor.onaudioprocess = (e) => {
+                            if (!isRunning) return;
+                            const left = e.inputBuffer.getChannelData(0);
+                            const right = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : left;
+                            const len = left.length;
+                            
+                            // Trộn 2 kênh (L+R)/2 thành Mono để triệt tiêu lệch pha âm thanh
+                            const pcm = new Int16Array(len);
+                            for (let i = 0; i < len; i++) {
+                                let mono = (left[i] + right[i]) * 0.5;
+                                if (mono > 1) mono = 1;
+                                else if (mono < -1) mono = -1;
+                                pcm[i] = mono < 0 ? mono * 0x8000 : mono * 0x7FFF;
+                            }
+                            
+                            // Gửi sang Worker nén không đụng chạm RAM
+                            mp3Worker.postMessage({ cmd: 'encode', pcm: pcm }, [pcm.buffer]);
+                        };
+
+                        audioSource.connect(audioProcessor);
+                        audioProcessor.connect(silentGain);
+                        silentGain.connect(audioContext.destination);
+
+                        mp3Worker.onmessage = (e) => {
+                            if (e.data.cmd === 'complete') {
+                                const mp3Blob = e.data.blob;
+                                downloadBlob(mp3Blob, `Clean_Audiobook_${Date.now()}.mp3`);
+                                statusBar.textContent = "✅ Đã tải file MP3 âm thanh chuẩn Google Play Books!";
+                            }
+                        };
+                    } else if (mode === 'video') {
+                        document.body.classList.add("recording-mode");
+                        let mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
+                        recordedChunks = [];
+                        mediaRecorder = new MediaRecorder(activeAudioStream, { mimeType });
+                        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+                        mediaRecorder.onstop = () => {
+                            const rawBlob = new Blob(recordedChunks, { type: mimeType });
+                            downloadBlob(rawBlob, `Video_Karaoke_${Date.now()}.webm`);
+                            statusBar.textContent = "✅ Đã lưu Video!";
+                            document.body.classList.remove("recording-mode");
+                        };
+                        mediaRecorder.start();
+                    }
+                } catch (err) { 
+                    console.error(err);
+                    stopAll(); 
+                    return; 
+                }
+            }
+
+            isRunning = true;
+            updatePlayBtnState(true);
+            playQueue(segments, 0, () => {
+                updateProgress(100);
+                finishAndExport(mode);
+            });
+        }
+
+        function finishAndExport(mode) {
+            if (mode === 'audio' && mp3Worker) {
+                statusBar.textContent = "⚡ Đang xuất file MP3 sạch...";
+                mp3Worker.postMessage({ cmd: 'finish' });
+            }
+            if (mode === 'video' && mediaRecorder?.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            setTimeout(() => stopAll(false), 500);
+        }
+
+        function downloadBlob(blob, filename) {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+        }
+
+        function playQueue(segs, i, done) {
+            if (!isRunning || i >= segs.length) return done?.();
+
+            const item = segs[i];
+            const utter = new SpeechSynthesisUtterance(item.text);
+
+            if (item.type === "inside") {
+                utter.voice = voices[voiceInEl.value];
+                utter.rate = parseFloat(rateInEl.value);
+            } else {
+                utter.voice = voices[voiceOutEl.value];
+                utter.rate = parseFloat(rateOutEl.value);
+            }
+
+            document.querySelectorAll(".active-seg").forEach(el => el.classList.remove("active-seg"));
+            const currentSegEl = document.getElementById(`seg_${i}`);
+            if (currentSegEl) currentSegEl.classList.add("active-seg");
+
+            utter.onboundary = (e) => {
+                if (e.name === 'word') {
+                    const charsSoFar = (cumulativeLengths[i] || 0) + (e.charIndex || 0);
+                    const pct = Math.min(99, (charsSoFar / (totalReadingLength || 1)) * 100);
+                    updateProgress(pct);
+
+                    const wordEl = document.getElementById(`w_${i}_${e.charIndex}`) || findClosestWord(i, e.charIndex);
+                    if (wordEl) {
+                        if (activeWordSpan) activeWordSpan.classList.remove("active-word");
+                        wordEl.classList.add("active-word");
+                        activeWordSpan = wordEl;
+                        wordEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            };
+
+            statusBar.textContent = `Đang đọc: "${item.text.slice(0, 36)}..."`;
+            utter.onend = () => setTimeout(() => playQueue(segs, i + 1, done), 350);
+            utter.onerror = () => playQueue(segs, i + 1, done);
+            synth.speak(utter);
+        }
+
+        function findClosestWord(sIdx, charIndex) {
+            const spans = document.querySelectorAll(`[id^="w_${sIdx}_"]`);
+            let closest = null, minDiff = Infinity;
+            spans.forEach(sp => {
+                const offset = parseInt(sp.id.split('_')[2]);
+                const diff = Math.abs(offset - charIndex);
+                if (diff < minDiff) { minDiff = diff; closest = sp; }
+            });
+            return closest;
+        }
+
+        function stopAll(manual = true) {
+            isRunning = false;
+            if (synth.speaking) synth.cancel();
+
+            if (manual) {
+                if (mp3Worker) {
+                    mp3Worker.terminate();
+                    mp3Worker = null;
+                }
+                if (mediaRecorder?.state !== "inactive") mediaRecorder?.stop();
+                statusBar.textContent = "Sẵn sàng";
+                updateProgress(0);
+            }
+
+            if (audioProcessor) { audioProcessor.disconnect(); audioProcessor = null; }
+            if (audioSource) { audioSource.disconnect(); audioSource = null; }
+            if (silentGain) { silentGain.disconnect(); silentGain = null; }
+            if (audioContext && audioContext.state !== 'closed') { audioContext.close(); audioContext = null; }
+            if (activeAudioStream) { activeAudioStream.getTracks().forEach(t => t.stop()); activeAudioStream = null; }
+
+            document.body.classList.remove("recording-mode");
+            readingViewer.style.display = "none";
+            textInput.style.display = "block";
+            if (activeWordSpan) {
+                activeWordSpan.classList.remove("active-word");
+                activeWordSpan = null;
+            }
+
+            updatePlayBtnState(false);
+        }
+
+        function updatePlayBtnState(running) {
+            const icon = document.getElementById("dialIcon");
+            if (running) {
+                dialMainBtn.classList.add("speaking");
+                statusDot.classList.add("busy");
+                icon.innerHTML = `<rect x="6" y="6" width="12" height="12" fill="currentColor"></rect>`;
+                dialMainBtn.title = "Nhấp để dừng ngay";
+            } else {
+                dialMainBtn.classList.remove("speaking");
+                statusDot.classList.remove("busy");
+                icon.innerHTML = `<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>`;
+                dialMainBtn.title = "Kéo để di chuyển / Nhấp để mở lệnh";
+            }
+        }
+    </script>
+</body>
+</html>
