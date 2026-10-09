@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sách Nói Song Ngữ</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-active: #1d4ed8;
+            --danger: #dc2626;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+
+            /* Màu sắc đọc */
+            --out-color: #0f172a;
+            --in-color: #059669;
+            --highlight-bg: #fde047;
+            --highlight-text: #713f12;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding-bottom: 90px; /* Chừa khoảng trống cho thanh điều khiển đáy */
+        }
+
+        .header {
+            background: #fff;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .btn-settings-toggle {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .main-container {
+            flex: 1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        /* KHUNG NHẬP LIỆU & TRÌNH CHIẾU */
+        .content-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            flex: 1;
+            min-height: 55vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        textarea {
+            width: 100%;
+            flex: 1;
+            padding: 16px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            line-height: 1.6;
+            resize: none;
+            font-family: inherit;
+        }
+
+        .reading-viewer {
+            display: none;
+            width: 100%;
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            scroll-behavior: smooth;
+        }
+
+        .pair-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pair-card.active-card {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+
+        .seg-outside {
+            color: var(--out-color);
+            font-size: 17px;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .seg-inside {
+            color: var(--in-color);
+            font-size: 15px;
+            font-style: italic;
+            line-height: 1.4;
+        }
+
+        .word-span {
+            display: inline-block;
+            border-radius: 3px;
+            padding: 0 1px;
+            transition: background 0.1s;
+        }
+
+        .active-word {
+            background-color: var(--highlight-bg) !important;
+            color: var(--highlight-text) !important;
+            font-weight: bold;
+            border-radius: 3px;
+        }
+
+        /* THANH ĐIỀU KHIỂN ĐÁY (FIXED BOTTOM BAR) */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-top: 1px solid var(--border);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 20;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+        }
+
+        .btn-play {
+            background: var(--primary);
+            color: #ffffff;
+            border: none;
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+        }
+
+        .btn-play.playing {
+            background: var(--danger);
+            box-shadow: 0 2px 6px rgba(220,38,38,0.3);
+        }
+
+        /* MODAL CÀI ĐẶT */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 30;
+            align-items: flex-end; /* Mở từ đáy màn hình điện thoại lên */
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-content {
+            background: #fff;
+            width: 100%;
+            border-radius: 16px 16px 0 0;
+            padding: 20px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.25s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .setting-group {
+            margin-bottom: 16px;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+        }
+
+        .range-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Tiêu đề -->
+    <header class="header">
+        <h1>Sách Nói Song Ngữ</h1>
+        <button class="btn-settings-toggle" id="btnOpenSettings" title="Cài đặt">⚙️</button>
+    </header>
+
+    <!-- Khung chính -->
+    <main class="main-container">
+        <div class="content-card">
+            <textarea id="textInput" placeholder="Nhập hoặc dán nội dung song ngữ tại đây... (Ví dụ: Hello [Xin chào])">I should begin by saying what an honor it is to make your acquaintance.
+[Tôi nên bắt đầu bằng cách nói rằng thật vinh dự được làm quen với bạn.]
+
+Practice makes perfect.
+[Rèn luyện tạo nên sự hoàn hảo.]</textarea>
+
+            <div id="readingViewer" class="reading-viewer"></div>
+        </div>
+    </main>
+
+    <!-- Thanh phát nhạc cố định bên dưới -->
+    <footer class="bottom-bar">
+        <div class="status-text" id="statusLabel">Sẵn sàng</div>
+        <button class="btn-play" id="btnTogglePlay">
+            <span id="btnIcon">▶</span>
+            <span id="btnText">Đọc</span>
+        </button>
+    </footer>
+
+    <!-- Cài đặt nhanh Giọng đọc (Bottom Sheet trên Mobile) -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                <h3 style="font-size: 16px;">Tùy chỉnh giọng đọc</h3>
+                <button id="btnCloseSettings" style="background:none; border:none; font-size: 20px;">✕</button>
+            </div>
+
+            <!-- Câu Ngoài Ngoặc -->
+            <div class="setting-group">
+                <label>🌐 Ngôn ngữ & Giọng đọc (Ngoài ngoặc)</label>
+                <select id="voiceOutSelect"></select>
+                <div class="range-row" style="margin-top: 8px;">
+                    <span style="font-size: 12px; width: 60px;">Tốc độ: <b id="rateOutVal">1.0x</b></span>
+                    <input type="range" id="rateOut" min="0.5" max="1.5" step="0.1" value="1.0">
+                </div>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 15px 0;">
+
+            <!-- Câu Trong Ngoặc -->
+            <div class="setting-group">
+                <label>🇻🇳 Ngôn ngữ & Giọng đọc (Trong ngoặc [ ])</label>
+                <select id="voiceInSelect"></select>
+                <div class="range-row" style="margin-top: 8px;">
+                    <span style="font-size: 12px; width: 60px;">Tốc độ: <b id="rateInVal">1.0x</b></span>
+                    <input type="range" id="rateIn" min="0.5" max="1.5" step="0.1" value="1.0">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let isSpeaking = false;
+        let cursorStart = 0;
+        let activeWordSpan = null;
+
+        // Elements
+        const textInput = document.getElementById("textInput");
+        const readingViewer = document.getElementById("readingViewer");
+        const statusLabel = document.getElementById("statusLabel");
+        const btnTogglePlay = document.getElementById("btnTogglePlay");
+        const btnIcon = document.getElementById("btnIcon");
+        const btnText = document.getElementById("btnText");
+
+        // Settings Elements
+        const settingsModal = document.getElementById("settingsModal");
+        const btnOpenSettings = document.getElementById("btnOpenSettings");
+        const btnCloseSettings = document.getElementById("btnCloseSettings");
+        const voiceOutSelect = document.getElementById("voiceOutSelect");
+        const voiceInSelect = document.getElementById("voiceInSelect");
+        const rateOut = document.getElementById("rateOut");
+        const rateIn = document.getElementById("rateIn");
+        const rateOutVal = document.getElementById("rateOutVal");
+        const rateInVal = document.getElementById("rateInVal");
+
+        /* ========== 1. KHỞI TẠO DANH SÁCH GIỌNG (ĐẶC TRỊ ANDROID) ========== */
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (!voices || voices.length === 0) return;
+
+            voiceOutSelect.innerHTML = "";
+            voiceInSelect.innerHTML = "";
+
+            voices.forEach((v, idx) => {
+                const optOut = document.createElement("option");
+                optOut.value = idx;
+                optOut.textContent = `${v.name} (${v.lang})`;
+                
+                const optIn = optOut.cloneNode(true);
+
+                // Ưu tiên chọn mặc định tiếng Anh ngoài ngoặc, tiếng Việt trong ngoặc
+                if (v.lang.startsWith("en") && !voiceOutSelect.querySelector("[selected]")) {
+                    optOut.selected = true;
+                }
+                if (v.lang.startsWith("vi") && !voiceInSelect.querySelector("[selected]")) {
+                    optIn.selected = true;
+                }
+
+                voiceOutSelect.appendChild(optOut);
+                voiceInSelect.appendChild(optIn);
+            });
+        }
+
+        // Khắc phục Edge/Chrome trên Android lúc có voiceschanged lúc không
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        let voiceInterval = setInterval(() => {
+            if (voices.length === 0) {
+                loadVoices();
+            } else {
+                clearInterval(voiceInterval);
+            }
+        }, 500);
+
+        /* ========== 2. XỬ LÝ TEXT & PHÂN TÁCH CẶP CÂU ========== */
+        function parseSegments(raw, startPos = 0) {
+            const segments = [];
+            const regex = /\[(.*?)\]|([^\[\]]+)/gs;
+            let match;
+
+            while ((match = regex.exec(raw)) !== null) {
+                if (match.index + match[0].length <= startPos) continue;
+
+                const isInside = match[1] !== undefined;
+                let txt = isInside ? match[1] : match[2];
+
+                if (match.index < startPos) {
+                    const offset = isInside ? Math.max(0, startPos - (match.index + 1)) : startPos - match.index;
+                    txt = txt.substring(offset);
+                }
+
+                txt = txt.replace(/^\]+|\[+$/g, '').trim();
+                if (txt) {
+                    segments.push({
+                        text: txt,
+                        type: isInside ? "inside" : "outside"
+                    });
+                }
+            }
+            return segments;
+        }
+
+        function renderViewer(segments) {
+            readingViewer.innerHTML = "";
+            let currentCard = null;
+
+            segments.forEach((seg, sIdx) => {
+                // Tạo nhóm thẻ hiển thị cặp câu
+                if (seg.type === 'outside' || !currentCard) {
+                    currentCard = document.createElement("div");
+                    currentCard.className = "pair-card";
+                    readingViewer.appendChild(currentCard);
+                }
+
+                const segDiv = document.createElement("div");
+                segDiv.id = `seg_${sIdx}`;
+                segDiv.className = seg.type === 'inside' ? 'seg-inside' : 'seg-outside';
+
+                // Tách từng từ để bôi màu highlight
+                let offset = 0;
+                const words = seg.text.split(/(\s+)/);
+                words.forEach(w => {
+                    if (w.trim() === "") {
+                        segDiv.appendChild(document.createTextNode(w));
+                    } else {
+                        const span = document.createElement("span");
+                        span.className = "word-span";
+                        span.id = `w_${sIdx}_${offset}`;
+                        span.textContent = w;
+                        segDiv.appendChild(span);
+                    }
+                    offset += w.length;
+                });
+
+                currentCard.appendChild(segDiv);
+            });
+        }
+
+        /* ========== 3. ĐIỀU KHIỂN ĐỌC (TTS CORE) ========== */
+        function startReading() {
+            stopReading();
+
+            const text = textInput.value;
+            if (!text.trim()) return;
+
+            cursorStart = textInput.selectionStart || 0;
+            const segments = parseSegments(text, cursorStart);
+            if (segments.length === 0) return;
+
+            renderViewer(segments);
+            textInput.style.display = "none";
+            readingViewer.style.display = "block";
+
+            isSpeaking = true;
+            updatePlayBtnState(true);
+
+            // Bắt buộc gọi resume trên Android để kích hoạt Web Audio Context
+            synth.resume();
+
+            playSegmentQueue(segments, 0);
+        }
+
+        function playSegmentQueue(segments, index) {
+            if (!isSpeaking || index >= segments.length) {
+                stopReading();
+                return;
+            }
+
+            const item = segments[index];
+            const utter = new SpeechSynthesisUtterance(item.text);
+
+            const isInside = item.type === "inside";
+            const selectedVoiceIndex = isInside ? voiceInSelect.value : voiceOutSelect.value;
+            const rate = isInside ? rateIn.value : rateOut.value;
+
+            if (voices[selectedVoiceIndex]) {
+                utter.voice = voices[selectedVoiceIndex];
+                utter.lang = voices[selectedVoiceIndex].lang; // Rất quan trọng cho Android
+            }
+            utter.rate = parseFloat(rate);
+
+            // Cập nhật viền xanh cho thẻ câu đang đọc
+            const segEl = document.getElementById(`seg_${index}`);
+            document.querySelectorAll(".pair-card").forEach(c => c.classList.remove("active-card"));
+            if (segEl && segEl.parentElement) {
+                segEl.parentElement.classList.add("active-card");
+                segEl.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Theo dõi vị trí từ để tô màu (Highlight)
+            utter.onboundary = (e) => {
+                if (e.name === 'word') {
+                    const wordEl = document.getElementById(`w_${index}_${e.charIndex}`) || findClosestWord(index, e.charIndex);
+                    if (wordEl) {
+                        if (activeWordSpan) activeWordSpan.classList.remove("active-word");
+                        wordEl.classList.add("active-word");
+                        activeWordSpan = wordEl;
+                    }
+                }
+            };
+
+            statusLabel.textContent = `Đang đọc: "${item.text.slice(0, 30)}..."`;
+
+            utter.onend = () => {
+                setTimeout(() => playSegmentQueue(segments, index + 1), 200);
+            };
+
+            utter.onerror = (err) => {
+                console.warn("Lỗi TTS:", err);
+                playSegmentQueue(segments, index + 1);
+            };
+
+            synth.speak(utter);
+        }
+
+        function findClosestWord(sIdx, charIndex) {
+            const spans = document.querySelectorAll(`[id^="w_${sIdx}_"]`);
+            let closest = null, minDiff = Infinity;
+            spans.forEach(sp => {
+                const offset = parseInt(sp.id.split('_')[2]);
+                const diff = Math.abs(offset - charIndex);
+                if (diff < minDiff) { minDiff = diff; closest = sp; }
+            });
+            return closest;
+        }
+
+        function stopReading() {
+            isSpeaking = false;
+            synth.cancel();
+
+            readingViewer.style.display = "none";
+            textInput.style.display = "block";
+            if (activeWordSpan) {
+                activeWordSpan.classList.remove("active-word");
+                activeWordSpan = null;
+            }
+
+            updatePlayBtnState(false);
+            statusLabel.textContent = "Sẵn sàng";
+        }
+
+        function updatePlayBtnState(speaking) {
+            if (speaking) {
+                btnTogglePlay.classList.add("playing");
+                btnIcon.textContent = "⏹";
+                btnText.textContent = "Dừng";
+            } else {
+                btnTogglePlay.classList.remove("playing");
+                btnIcon.textContent = "▶";
+                btnText.textContent = "Đọc";
+            }
+        }
+
+        /* ========== 4. SỰ KIỆN TƯƠNG TÁC ========== */
+        btnTogglePlay.addEventListener("click", () => {
+            if (isSpeaking) stopReading();
+            else startReading();
+        });
+
+        // Bật/tắt Modal Settings
+        btnOpenSettings.addEventListener("click", () => settingsModal.classList.add("active"));
+        btnCloseSettings.addEventListener("click", () => settingsModal.classList.remove("active"));
+        settingsModal.addEventListener("click", (e) => {
+            if (e.target === settingsModal) settingsModal.classList.remove("active");
+        });
+
+        // Thanh trượt tốc độ
+        rateOut.addEventListener("input", () => rateOutVal.textContent = `${rateOut.value}x`);
+        rateIn.addEventListener("input", () => rateInVal.textContent = `${rateIn.value}x`);
+    </script>
+</body>
+</html>
